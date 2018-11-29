@@ -22,10 +22,10 @@ goal = [2.3;0.4];
 plot(goal(1),goal(2),'*','markersize',12)
 
 % Ellipsoidal obstacle
-P = [1/0.32, 0; 0, 1/0.52];
-center = [0;0.7];
+P = [0.5, 0; 0, 0.5];
+center = [0;0];
 t = linspace(0,2*pi,30);
-patch(1/sqrt( P(1,1))*cos(t) + center(1), 1/sqrt(P(2,2))*sin(t) + center(2),[0.32,0.32,0.32]); %create a filled polygon - in this case an oval
+patch( P(1,1)*cos(t) + center(1), P(2,2)*sin(t) + center(2),[0.32,0.32,0.32]); %create a filled polygon - in this case an oval
 axis(3.*[-1,1,-1,1])            %define axis of the graph
 
 % Plot
