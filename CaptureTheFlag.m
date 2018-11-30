@@ -2,6 +2,8 @@ clear all, close all, clc
 
 %INITIALIZE VARIABLES
 N=10;                        % Agents per team
+Obstacles = 5;               % Number of obstacles
+ob = zeros(3,Obstacles);
 Offense = 5;
 Defense = 5;
 
@@ -18,7 +20,7 @@ xuni = r.get_poses();                                    % States of real unicyc
 x = xuni(1:2,:);                                            % x-y positions only
 r.set_velocities(1:N, zeros(2,N));                       % Assign dummy zero velocity
 r.step();                                                % Run robotarium step
-PopulateHazards(5,[0.03,0.2],[-1,1;-1,1]);
+ob = PopulateHazards(Obstacles,[0.03,0.2],[-1,1;-1,1]);
 [si_to_uni_dyn] = create_si_to_uni_mapping3();
   
 
@@ -35,7 +37,7 @@ for k = 1:max_iter
          end
      end
      
-    disp(k);
+    %disp(k);
     dx = si_to_uni_dyn(u, xuni);                            % Convert single integrator inputs into unicycle inputs
     r.set_velocities(1:N, dx); r.step();                    % Set new velocities to robots and update
 end
@@ -47,18 +49,42 @@ r.debug();
 
 
 % FUNCTIONS HERE!!!
-function PopulateHazards(number,sizes,arena)
+function y = PopulateHazards(number,sizes,arena)
+fuck(1:3,1:number) = 999;
     for k = 1:number
+        valid = 0;
         sz = rand;
         width = arena(1,2)-arena(1,1);
         height = arena(2,2)-arena(1,1);
+        
         loc = rand(2,1) - [0.5;0.5];
         loc = [width,0;0,height]*loc;
-        
         result = (sizes(2) - sizes(1))*sz;
         actualSize = sizes(1) + result;
+        
+        while valid < (k)
+            loc = rand(2,1) - [0.5;0.5];
+        loc = [width,0;0,height]*loc;
+            for a = 1:k
+                %disp(sqrt((fuck(2,a) - loc(1,1)).^2 + (fuck(3,a) - loc(2,1)).^2));
+                %disp(fuck(1,a) + actualSize);
+                disp(loc);
+                disp(fuck(2:3,a));
+                if  sqrt((fuck(2,a) - loc(1,1)).^2 + (fuck(3,a) - loc(2,1)).^2) > ((actualSize + fuck(1,a)) + 0.01) 
+                    valid = valid + 1;
+                end
+            end
+        
+        end    
+
         CreateObstacle(actualSize,loc);
+        fuck(1,k) = actualSize;
+        fuck(2:3,k) = loc;
+        disp(fuck);
+        %disp(ob(1,k));
+        %disp(ob(2:3,k));
     end
+    y = fuck;
 end
 
 function CreateObstacle(size,location)

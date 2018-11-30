@@ -1,7 +1,9 @@
 clear all, close all, clc
 
 %INITIALIZE VARIABLES
-N=7;                        % Agents per team
+N=10;                        % Agents per team
+Obstacles = 5;               % Number of obstacles
+ob = zeros(3,Obstacles);
 Offense = 5;
 Defense = 5;
 
@@ -18,7 +20,7 @@ xuni = r.get_poses();                                    % States of real unicyc
 x = xuni(1:2,:);                                            % x-y positions only
 r.set_velocities(1:N, zeros(2,N));                       % Assign dummy zero velocity
 r.step();                                                % Run robotarium step
-PopulateHazards(3,[0,0.5],[-1,1;-1,1]);
+PopulateHazards(Obstacles,[0.03,0.2],[-1,1;-1,1]);
 [si_to_uni_dyn] = create_si_to_uni_mapping3();
   
 
@@ -35,7 +37,7 @@ for k = 1:max_iter
          end
      end
      
-    disp(k);
+    %disp(k);
     dx = si_to_uni_dyn(u, xuni);                            % Convert single integrator inputs into unicycle inputs
     r.set_velocities(1:N, dx); r.step();                    % Set new velocities to robots and update
 end
@@ -49,15 +51,30 @@ r.debug();
 % FUNCTIONS HERE!!!
 function PopulateHazards(number,sizes,arena)
     for k = 1:number
+        valid = 0;
         sz = rand;
         width = arena(1,2)-arena(1,1);
         height = arena(2,2)-arena(1,1);
+        
         loc = rand(2,1) - [0.5;0.5];
         loc = [width,0;0,height]*loc;
         
-        result = (sizes(2) - sizes(1))*rd;
+        while valid < k
+            for a = 1:k
+                if 
+                   sqrt((ob(2,a) - ob(2,k)).^2 + ()); 
+                end
+            end
+        end    
+        
+        result = (sizes(2) - sizes(1))*sz;
         actualSize = sizes(1) + result;
         CreateObstacle(actualSize,loc);
+        ob(1,k) = actualSize;
+        ob(2:3,k) = loc;
+        disp(ob);
+        disp(ob(1,k));
+        disp(ob(2:3,k));
     end
 end
 
