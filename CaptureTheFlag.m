@@ -2,8 +2,11 @@ clear all, close all, clc
 
 %INITIALIZE VARIABLES
 N=10;                        % Agents per team
-Obstacles = 5;               % Number of obstacles
+Obstacles = 7;               % Number of obstacles
 ob = zeros(3,Obstacles);
+init(1,1:N) = 2.5;
+init(2,1:N) = [-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9];
+init(3,1:N) = 0;
 Offense = 5;
 Defense = 5;
 
@@ -14,13 +17,13 @@ videoFLag = 0;                          % Change to 1 to record video
 circularInitialConditions = 0;          % Change to 0 for random initial condition (needed for Q2.d)
                            
 % INITIALIZE ROBOTARIUM
-r = Robotarium('NumberOfRobots', N, 'ShowFigure', true);
+r = Robotarium('NumberOfRobots', N, 'ShowFigure', true, 'InitialConditions', init);
 
 xuni = r.get_poses();                                    % States of real unicycle robots
 x = xuni(1:2,:);                                            % x-y positions only
 r.set_velocities(1:N, zeros(2,N));                       % Assign dummy zero velocity
 r.step();                                                % Run robotarium step
-ob = PopulateHazards(Obstacles,[0.03,0.2],[-1,1;-1,1]);
+ob = PopulateHazards(Obstacles,[0.05,0.3],[-1.5,1.5;-1.7,1.7]);
 [si_to_uni_dyn] = create_si_to_uni_mapping3();
   
 
@@ -63,15 +66,14 @@ fuck(1:3,1:number) = 999;
         actualSize = sizes(1) + result;
         
         while valid < (k)
-            loc = rand(2,1) - [0.5;0.5];
+        loc = rand(2,1) - [0.5;0.5];
         loc = [width,0;0,height]*loc;
+        valid = 0;
             for a = 1:k
-                %disp(sqrt((fuck(2,a) - loc(1,1)).^2 + (fuck(3,a) - loc(2,1)).^2));
-                %disp(fuck(1,a) + actualSize);
-                disp(loc);
-                disp(fuck(2:3,a));
+                disp(valid);
                 if  sqrt((fuck(2,a) - loc(1,1)).^2 + (fuck(3,a) - loc(2,1)).^2) > ((actualSize + fuck(1,a)) + 0.01) 
                     valid = valid + 1;
+                    disp(sqrt((fuck(2,a) - loc(1,1)).^2 + (fuck(3,a) - loc(2,1)).^2) - (fuck(1,a) + actualSize));
                 end
             end
         
@@ -81,8 +83,6 @@ fuck(1:3,1:number) = 999;
         fuck(1,k) = actualSize;
         fuck(2:3,k) = loc;
         disp(fuck);
-        %disp(ob(1,k));
-        %disp(ob(2:3,k));
     end
     y = fuck;
 end

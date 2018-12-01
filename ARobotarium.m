@@ -16,7 +16,7 @@ classdef ARobotarium < handle
         robot_diameter = 0.1
         wheel_radius = 0.01;
         base_length = 0.05;          
-        boundaries = [-1.6, 1.6, -1, 1];      
+        boundaries = [-3, 3, -2, 2];      
     end
     
     properties (GetAccess = public, SetAccess = protected)
