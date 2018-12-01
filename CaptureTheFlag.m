@@ -5,7 +5,7 @@ N=10;                        % Agents per team
 Obstacles = 7;               % Number of obstacles
 ob = zeros(3,Obstacles);
 init(1,1:N) = 2.5;
-init(2,1:N) = [-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9];
+init(2,1:N) = linspace(-1.5,1.5,10);
 init(3,1:N) = 0;
 Offense = 5;
 Defense = 5;
@@ -24,6 +24,7 @@ x = xuni(1:2,:);                                            % x-y positions only
 r.set_velocities(1:N, zeros(2,N));                       % Assign dummy zero velocity
 r.step();                                                % Run robotarium step
 ob = PopulateHazards(Obstacles,[0.05,0.3],[-1.5,1.5;-1.7,1.7]);
+CreateFlag(0.2,[0,0])
 [si_to_uni_dyn] = create_si_to_uni_mapping3();
   
 
@@ -53,7 +54,7 @@ r.debug();
 
 % FUNCTIONS HERE!!!
 function y = PopulateHazards(number,sizes,arena)
-fuck(1:3,1:number) = 999;
+obstacleBuffer(1:3,1:number) = 999;
     for k = 1:number
         valid = 0;
         sz = rand;
@@ -71,20 +72,25 @@ fuck(1:3,1:number) = 999;
         valid = 0;
             for a = 1:k
                 disp(valid);
-                if  sqrt((fuck(2,a) - loc(1,1)).^2 + (fuck(3,a) - loc(2,1)).^2) > ((actualSize + fuck(1,a)) + 0.01) 
+                if  sqrt((obstacleBuffer(2,a) - loc(1,1)).^2 + (obstacleBuffer(3,a) - loc(2,1)).^2) > ((actualSize + obstacleBuffer(1,a)) + 0.01) 
                     valid = valid + 1;
-                    disp(sqrt((fuck(2,a) - loc(1,1)).^2 + (fuck(3,a) - loc(2,1)).^2) - (fuck(1,a) + actualSize));
+                    disp(sqrt((obstacleBuffer(2,a) - loc(1,1)).^2 + (obstacleBuffer(3,a) - loc(2,1)).^2) - (obstacleBuffer(1,a) + actualSize));
                 end
             end
         
         end    
 
         CreateObstacle(actualSize,loc);
-        fuck(1,k) = actualSize;
-        fuck(2:3,k) = loc;
-        disp(fuck);
+        obstacleBuffer(1,k) = actualSize;
+        obstacleBuffer(2:3,k) = loc;
+        disp(obstacleBuffer);
     end
-    y = fuck;
+    y = obstacleBuffer;
+end
+
+function CreateFlag(size,location)
+disp(location(2) + [0,sin(pi/4)*size,sin(pi/2)*size]);
+patch(location(1) + [0,cos(pi/4)*size,0],location(2) + [0,sin(pi/4)*size,sin(pi/2)*size],[1.0,0,0]);
 end
 
 function CreateObstacle(size,location)
