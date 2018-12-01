@@ -3,12 +3,14 @@ clear all, close all, clc
 %INITIALIZE VARIABLES
 N=10;                        % Agents per team
 Obstacles = 7;               % Number of obstacles
+visibility = 1;
 ob = zeros(3,Obstacles);
 init(1,1:N) = 2.5;
 init(2,1:N) = linspace(-1.5,1.5,10);
-init(3,1:N) = 0;
+init(3,1:N) = 2;
 Offense = 5;
 Defense = 5;
+A = zeros(N,N);
 
 dt=0.01;                   % numerical steplength
 max_iter = 2000;
@@ -21,15 +23,14 @@ r = Robotarium('NumberOfRobots', N, 'ShowFigure', true, 'InitialConditions', ini
 
 xuni = r.get_poses();                                    % States of real unicycle robots
 x = xuni(1:2,:);                                            % x-y positions only
+disp(x);
 r.set_velocities(1:N, zeros(2,N));                       % Assign dummy zero velocity
 r.step();                                                % Run robotarium step
 ob = PopulateHazards(Obstacles,[0.05,0.3],[-1.5,1.5;-1.7,1.7]);
 CreateFlag(0.25,[2,1.1])
-%h = circle(x(1,10),x(2,10),1);
-
 th = 0:pi/50:2*pi;
-xunit = 1 * cos(th) + x(1,10);
-yunit = 1 * sin(th) + x(2,10);
+xunit = visibility * cos(th) + x(1,10);
+yunit = visibility * sin(th) + x(2,10);
 h = plot(xunit, yunit);
 h.XDataSource = 'xunit';
 h.YDataSource = 'yunit';
@@ -48,12 +49,25 @@ for k = 1:max_iter
     yunit = 1 * sin(th) + x(2,10);
     refreshdata(h);
      for i= 1:N
-         for j= 1:N     
+         for j= 1:N  
+             if j ~= i
+                u(:,i) = u(:,i) + (1 - (0.4*A(i,j)) / (sqrt([1,1]*(x(:,j)-x(:,i)).^2))) * A(i,j)* (x(:,j)-x(:,i));
+                %disp((1 - 0.05 / (sqrt([1,1]*(x(:,j)-x(:,i)).^2)))* (x(:,j)-x(:,i)));
+                if (sqrt([1,1]*(x(:,j)-x(:,i)).^2)) < visibility
+                    A(i,j) = 1;
+                else
+                    A(i,j) = 0;
+                end
+             end
+%              if i == 4 && j == 1
+%              u(:,i) = u(:,i) + (center(:,j)-x(:,i));
+              
+%              end
          end
      end
-     
-     u(2,10) = u(2,10) - 1;
-    %disp(k);
+     %disp(x);
+    %u(2,10) = u(2,10) - 1;                                  % move for no reason
+    disp(u);
     dx = si_to_uni_dyn(u, xuni);                            % Convert single integrator inputs into unicycle inputs
     r.set_velocities(1:N, dx); r.step();                    % Set new velocities to robots and update
 end
