@@ -24,7 +24,16 @@ x = xuni(1:2,:);                                            % x-y positions only
 r.set_velocities(1:N, zeros(2,N));                       % Assign dummy zero velocity
 r.step();                                                % Run robotarium step
 ob = PopulateHazards(Obstacles,[0.05,0.3],[-1.5,1.5;-1.7,1.7]);
-CreateFlag(0.2,[0,0])
+CreateFlag(0.25,[2,1.1])
+%h = circle(x(1,10),x(2,10),1);
+
+th = 0:pi/50:2*pi;
+xunit = 1 * cos(th) + x(1,10);
+yunit = 1 * sin(th) + x(2,10);
+h = plot(xunit, yunit);
+h.XDataSource = 'xunit';
+h.YDataSource = 'yunit';
+
 [si_to_uni_dyn] = create_si_to_uni_mapping3();
   
 
@@ -35,12 +44,15 @@ for k = 1:max_iter
     xuni = r.get_poses();                                   % Get new robots' states
     x = xuni(1:2,:);                                        % Extract single integrator states
     u=zeros(2,N);                                           % Initialize velocities to zero
-
+    xunit = 1 * cos(th) + x(1,10);
+    yunit = 1 * sin(th) + x(2,10);
+    refreshdata(h);
      for i= 1:N
          for j= 1:N     
          end
      end
      
+     u(2,10) = u(2,10) - 1;
     %disp(k);
     dx = si_to_uni_dyn(u, xuni);                            % Convert single integrator inputs into unicycle inputs
     r.set_velocities(1:N, dx); r.step();                    % Set new velocities to robots and update
@@ -89,8 +101,7 @@ obstacleBuffer(1:3,1:number) = 999;
 end
 
 function CreateFlag(size,location)
-disp(location(2) + [0,sin(pi/4)*size,sin(pi/2)*size]);
-patch(location(1) + [0,cos(pi/4)*size,0],location(2) + [0,sin(pi/4)*size,sin(pi/2)*size],[1.0,0,0]);
+patch(location(1) + [0,-cos(pi/4)*size,0],location(2) + [0,sin(pi/4)*size,sin(pi/2)*size],[1.0,0,0]);
 end
 
 function CreateObstacle(size,location)
@@ -98,4 +109,16 @@ P = [size, 0; 0, size];
 center = location;
 t = linspace(0,2*pi,30);
 patch(P(1,1)*cos(t) + center(1), P(2,2)*sin(t) + center(2), [0.32,0.32,0.32]); %create a filled polygon - in this case an oval
+end
+
+function h = circle(x,y,r)
+%hold on
+
+th = 0:pi/50:2*pi;
+xunit = r * cos(th) + x;
+yunit = r * sin(th) + y;
+h = plot(xunit, yunit);
+h.XDataSource = 'xunit';
+h.YDataSource = 'yunit';
+%hold off
 end

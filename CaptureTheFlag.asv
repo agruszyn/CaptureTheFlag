@@ -24,7 +24,10 @@ x = xuni(1:2,:);                                            % x-y positions only
 r.set_velocities(1:N, zeros(2,N));                       % Assign dummy zero velocity
 r.step();                                                % Run robotarium step
 ob = PopulateHazards(Obstacles,[0.05,0.3],[-1.5,1.5;-1.7,1.7]);
-CreateF
+CreateFlag(0.25,[2,1.1])
+
+
+
 [si_to_uni_dyn] = create_si_to_uni_mapping3();
   
 
@@ -35,7 +38,7 @@ for k = 1:max_iter
     xuni = r.get_poses();                                   % Get new robots' states
     x = xuni(1:2,:);                                        % Extract single integrator states
     u=zeros(2,N);                                           % Initialize velocities to zero
-
+    
      for i= 1:N
          for j= 1:N     
          end
@@ -89,11 +92,22 @@ obstacleBuffer(1:3,1:number) = 999;
 end
 
 function CreateFlag(size,location)
-patch(location(1) + [0,cos(pi/4)*size,0],location(2) + [0,sin(pi/4)*size,sin(pi/2)*size],[255,0,0]);
+disp(location(2) + [0,sin(pi/4)*size,sin(pi/2)*size]);
+patch(location(1) + [0,cos(pi/4)*size,0],location(2) + [0,sin(pi/4)*size,sin(pi/2)*size],[1.0,0,0]);
 end
+
 function CreateObstacle(size,location)
 P = [size, 0; 0, size];
 center = location;
 t = linspace(0,2*pi,30);
 patch(P(1,1)*cos(t) + center(1), P(2,2)*sin(t) + center(2), [0.32,0.32,0.32]); %create a filled polygon - in this case an oval
+end
+
+function h = circle(x,y,r)
+%hold on
+th = 0:pi/50:2*pi;
+xunit = r * cos(th) + x;
+yunit = r * sin(th) + y;
+h = plot(xunit, yunit);
+%hold off
 end
