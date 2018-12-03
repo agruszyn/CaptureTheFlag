@@ -1,82 +1,120 @@
 clear all, close all, clc
 
+%(------------------------------------------ PARAMETERS ------------------------------------------)
+%%
+hazardTotal = 7;                            % Total number of obstacles
+hazardSizes = [0.05,0.3];
+hazardWindow = [-1.5,1.5;-1.7,1.7];
+
+flagSize = 0.25;
+redFlagpos = [2,1.1];
+blueFlagpos = [-2,-1.1];
+
+N = 10;                                     % Total number of players team
+init(1,1:N) = 2.5;                          % starting X position
+init(2,1:N) = linspace(-1.5,1.5,10);        % starting Y position
+init(3,1:N) = 2;                            % starting rotation
+viewingDistance = 1;                        % Range of vision for each player
+
+max_iter = 2000;                            % max script time
+dt = 0.01;                                  % numerical steplength
+
+lambda = 0.05;                              % lambda for barrier certificate
+safety = 1.5 * r.robot_diameter;            % safety distance for barrier certificate
+%%
+%(------------------------------------------ INITIALIZATIONS ------------------------------------------)
+%%
 %INITIALIZE VARIABLES
-N=10;                        % Agents per team
-Obstacles = 7;               % Number of obstacles
-visibility = 1;
-ob = zeros(3,Obstacles);
-init(1,1:N) = 2.5;
-init(2,1:N) = linspace(-1.5,1.5,10);
-init(3,1:N) = 0;
-Offense = 5;
-Defense = 5;
-W = zeros(N,N);
+hazardProperties = zeros(3,hazardTotal);    % Location and size of hazards
+center = [0;0];                             % center of field
+A = zeros(N,N);                             % agent connection matrix
+th = 0:pi/50:2*pi;                          % list of points around a circle
 
-dt=0.01;                   % numerical steplength
-max_iter = 2000;
-center = [0;0];
-videoFLag = 0;                          % Change to 1 to record video
-circularInitialConditions = 0;          % Change to 0 for random initial condition (needed for Q2.d)
-                           
 % INITIALIZE ROBOTARIUM
-r = Robotarium('NumberOfRobots', N, 'ShowFigure', true, 'InitialConditions', init);
+r = Robotarium('NumberOfRobots', N, 'ShowFigure', true, 'InitialConditions', init);     % Robotarium initial conditions
 
-xuni = r.get_poses();                                    % States of real unicycle robots
+xuni = r.get_poses();                                       % States of real unicycle robots
 x = xuni(1:2,:);                                            % x-y positions only
-disp(x);
-r.set_velocities(1:N, zeros(2,N));                       % Assign dummy zero velocity
-r.step();                                                % Run robotarium step
-ob = PopulateHazards(Obstacles,[0.05,0.3],[-1.5,1.5;-1.7,1.7]);
-CreateFlag(0.25,[2,1.1])
-th = 0:pi/50:2*pi;
-xunit = visibility * cos(th) + x(1,10);
-yunit = visibility * sin(th) + x(2,10);
-h = plot(xunit, yunit);
-h.XDataSource = 'xunit';
-h.YDataSource = 'yunit';
+r.set_velocities(1:N, zeros(2,N));                          % Assign dummy zero velocity
+r.step();                                                   % Run robotarium step
+hazardProperties = PopulateHazards(hazardTotal, hazardSizes, hazardWindow);     % create the hazards
 
-[si_to_uni_dyn] = create_si_to_uni_mapping3();
-  
+CreateFlag(flagSize, redFlagpos, 'red');                                % create the red flag
+CreateFlag(flagSize, blueFlagpos, 'blue');                              % create the blue flag
 
-% AGENT LOGIC HERE!!!
+xunit = viewingDistance * cos(th) + x(1,10);                    % x position of points around a circle
+yunit = viewingDistance * sin(th) + x(2,10);                    % y position of points around a circle
+h = plot(xunit, yunit);                                         % plot the circle
+h.XDataSource = 'xunit'; h.YDataSource = 'yunit';               % source for updating circle position
+
+
+[si_to_uni_dyn] = create_si_to_uni_mapping2();                  % unicycle mapping
+% Grab barrier certificates for unicycle dynamics
+uni_barrier_cert = create_uni_barrier_certificate('SafetyRadius', safety, 'ProjectionDistance', lambda);    % barrier mapping
+%%
+%(------------------------------------------ UPDATE FUNCTION ------------------------------------------)
+%%
 for k = 1:max_iter
-    
-    % Get new data and initialize new null velocities
+    disp(k);
     xuni = r.get_poses();                                   % Get new robots' states
-    x = xuni(1:2,:);                                        % Extract single integrator states
-    u=zeros(2,N);                                           % Initialize velocities to zero
-    xunit = 1 * cos(th) + x(1,10);
-    yunit = 1 * sin(th) + x(2,10);
+    
+    % group up together
+    u = GroupUp(0.5, xuni, N, A);
+    
+    %update the circle
+    [xunit, yunit] = UpdateCircle(xuni(1:2,:), th, viewingDistance);
     refreshdata(h);
-     for i= 1:N
-         for j= 1:N  
-             if j ~= i
-                u(:,i) = u(:,i) + (1 - 0.4 / (sqrt([1,1]*(x(:,j)-x(:,i)).^2)))* (x(:,j)-x(:,i));
-                %disp((1 - 0.05 / (sqrt([1,1]*(x(:,j)-x(:,i)).^2)))* (x(:,j)-x(:,i)));
-                if (sqrt([1,1]*(x(:,j)-x(:,i)).^2)) < visibility
-                    W(i,j) = 1;
-                end
-             else
-                 
-             end
-             if i == 4 && j == 1
-             u(:,i) = u(:,i) + (center(:,j)-x(:,i));
-             end
-         end
-     end
-     %disp(x);
-    %u(2,10) = u(2,10) - 1;                                  % move for no reason
+    
+    %update the edges
+    A = UpdateConnections(A,viewingDistance, x, N);
+    
+    %move robots
     dx = si_to_uni_dyn(u, xuni);                            % Convert single integrator inputs into unicycle inputs
+    dx = uni_barrier_cert(dx, xuni);
     r.set_velocities(1:N, dx); r.step();                    % Set new velocities to robots and update
 end
 
 % experiment is over!
 r.debug();
+%%
+%(------------------------------------------ FUNCTIONS ------------------------------------------)
+%%
+function [x,y] = UpdateCircle(x, th, range)
+    xunit = range * cos(th) + x(1,10);
+    yunit = range * sin(th) + x(2,10);
+    x = xunit;
+    y = yunit;
+end
 
+function y = UpdateConnections(A, viewingDistance, x, N)
+    for i= 1:N
+         for j= 1:N  
+             if j ~= i
+                if (sqrt([1,1]*(x(:,j)-x(:,i)).^2)) < viewingDistance
+                    A(i,j) = 1;
+                else
+                    A(i,j) = 0;
+                end
+             end
+         end
+    end
+    y = A;
+end
 
+function y = GroupUp(distance, xuni, N, A)
+% Get new data and initialize new null velocities  
+    x = xuni(1:2,:);                             % Extract single integrator states
+    u = zeros(2,N);                                % Initialize velocities to zero
+     for i= 1:N
+         for j= 1:N  
+             if j ~= i
+                u(:,i) = u(:,i) + (1 - (distance*A(i,j)) / (sqrt([1,1] * (x(:,j)-x(:,i)).^2))) * A(i,j) * (x(:,j)-x(:,i));
+             end
+         end
+     end
+     y = u;
+end
 
-
-% FUNCTIONS HERE!!!
 function y = PopulateHazards(number,sizes,arena)
 obstacleBuffer(1:3,1:number) = 999;
     for k = 1:number
@@ -95,10 +133,8 @@ obstacleBuffer(1:3,1:number) = 999;
         loc = [width,0;0,height]*loc;
         valid = 0;
             for a = 1:k
-                disp(valid);
                 if  sqrt((obstacleBuffer(2,a) - loc(1,1)).^2 + (obstacleBuffer(3,a) - loc(2,1)).^2) > ((actualSize + obstacleBuffer(1,a)) + 0.01) 
                     valid = valid + 1;
-                    disp(sqrt((obstacleBuffer(2,a) - loc(1,1)).^2 + (obstacleBuffer(3,a) - loc(2,1)).^2) - (obstacleBuffer(1,a) + actualSize));
                 end
             end
         
@@ -107,13 +143,12 @@ obstacleBuffer(1:3,1:number) = 999;
         CreateObstacle(actualSize,loc);
         obstacleBuffer(1,k) = actualSize;
         obstacleBuffer(2:3,k) = loc;
-        disp(obstacleBuffer);
     end
     y = obstacleBuffer;
 end
 
-function CreateFlag(size,location)
-patch(location(1) + [0,-cos(pi/4)*size,0],location(2) + [0,sin(pi/4)*size,sin(pi/2)*size],[1.0,0,0]);
+function CreateFlag(size,location,color)
+patch(location(1) + [0,-cos(pi/4)*size,0],location(2) + [0,sin(pi/4)*size,sin(pi/2)*size],color);
 end
 
 function CreateObstacle(size,location)
