@@ -14,13 +14,14 @@ N = 10;                                     % Total number of players team
 init(1,1:N) = 2.5;                          % starting X position
 init(2,1:N) = linspace(-1.5,1.5,10);        % starting Y position
 init(3,1:N) = 2;                            % starting rotation
-viewingDistance = 1;                        % Range of vision for each player
+viewingDistance = 2;                        % Range of vision for each player
+D = 5;                                      % Number of Defense players
 
 max_iter = 2000;                            % max script time
 dt = 0.01;                                  % numerical steplength
 
 lambda = 0.05;                              % lambda for barrier certificate
-safety = 1.5 * r.robot_diameter;            % safety distance for barrier certificate
+barrierDistance = 1.2;                       % safety distance for barrier certificate
 %%
 %(------------------------------------------ INITIALIZATIONS ------------------------------------------)
 %%
@@ -32,6 +33,7 @@ th = 0:pi/50:2*pi;                          % list of points around a circle
 
 % INITIALIZE ROBOTARIUM
 r = Robotarium('NumberOfRobots', N, 'ShowFigure', true, 'InitialConditions', init);     % Robotarium initial conditions
+safety = barrierDistance * r.robot_diameter; 
 
 xuni = r.get_poses();                                       % States of real unicycle robots
 x = xuni(1:2,:);                                            % x-y positions only
@@ -59,7 +61,7 @@ for k = 1:max_iter
     xuni = r.get_poses();                                   % Get new robots' states
     
     % group up together
-    u = GroupUp(0.5, xuni, N, A);
+    u = GroupUp(0.1, xuni, N, A);
     
     %update the circle
     [xunit, yunit] = UpdateCircle(xuni(1:2,:), th, viewingDistance);
