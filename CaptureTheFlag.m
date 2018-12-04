@@ -4,7 +4,7 @@ clear all, close all, clc
 %%
 hazardTotal = 7;                            % Total number of obstacles
 hazardSizes = [0.05,0.3];
-hazardWindow = [-1.5,1.5;-1.7,1.7];
+hazardWindow = [-1,1;-1.8,1.8];
 
 flagSize = 0.25;
 redFlagpos = [2,1.1];
@@ -12,12 +12,13 @@ blueFlagpos = [-2,-1.1];
 
 N = 10;                                     % Total number of players team
 init(1,1:N) = 2.5;                          % starting X position
-init(2,1:N) = linspace(-1.5,1.5,10);        % starting Y position
+init(2,1:N) = linspace(1.5,-1.5,10);        % starting Y position
 init(3,1:N) = 2;                            % starting rotation
 viewingDistance = 2;                        % Range of vision for each player
-D = 5;                                      % Number of Defense players
+D = [1,5];                                  % Players on Defense
+O = [6,10];                                 % Players on Offense
 
-max_iter = 2000;                            % max script time
+max_iter = 3000;                            % max script time
 dt = 0.01;                                  % numerical steplength
 
 lambda = 0.05;                              % lambda for barrier certificate
@@ -59,10 +60,16 @@ uni_barrier_cert = create_uni_barrier_certificate('SafetyRadius', safety, 'Proje
 for k = 1:max_iter
     disp(k);
     xuni = r.get_poses();                                   % Get new robots' states
+    u = zeros(2,N);
     
     % group up together
-    u = GroupUp(0.1, xuni, N, A);
-    
+    if k < 700
+    u(:,D(1):D(2)) = Huddle(0.4, xuni, D, A, redFlagpos, flagSize);                 % Defense huddle
+    u(:,O(1):O(2)) = Huddle(0.4, xuni, O, A, (redFlagpos - [0,2]), flagSize);       % Offense huddle
+    end
+    if k > 700
+    u(:,D(1):D(2)) = CircleAround(xuni, D, A);
+    end
     %update the circle
     [xunit, yunit] = UpdateCircle(xuni(1:2,:), th, viewingDistance);
     refreshdata(h);
@@ -72,7 +79,7 @@ for k = 1:max_iter
     
     %move robots
     dx = si_to_uni_dyn(u, xuni);                            % Convert single integrator inputs into unicycle inputs
-    dx = uni_barrier_cert(dx, xuni);
+    %dx = uni_barrier_cert(dx, xuni);
     r.set_velocities(1:N, dx); r.step();                    % Set new velocities to robots and update
 end
 
@@ -81,6 +88,54 @@ r.debug();
 %%
 %(------------------------------------------ FUNCTIONS ------------------------------------------)
 %%
+function y = CircleAround(xuni, players, A)
+teamSize = players(2) - players(1) + 1;
+
+R = [cos(pi/teamSize) sin(pi/teamSize); -sin(pi/teamSize) cos(pi/teamSize)];
+x = xuni(1:2,players(1):players(2));                                      % Extract single integrator states
+u = zeros(2,teamSize);                                                    % Initialize velocities to zero
+L = CreateCircleGraph(A(players(1):players(2),players(1):players(2)));
+    for i= 1:teamSize
+         for j= 1:teamSize  
+             if j ~= i
+                u(:,i) = u(:,i) + 0.5 * L(i,j) * (x(:,j)-x(:,i));
+             end
+         end
+     
+    end
+    u = R * u;
+    y = u;
+end
+
+function y = CreateCircleGraph(A)
+N = size(A,1);
+L = A;
+    for i= 1:N
+         for j= 1:N  
+             if j ~=  (i + 1)
+                L(i,j) = 0;
+             end
+             if j == (i + 1) && L(i,j) == 1
+                 L(i,j) = 1;
+             end
+             if i == N
+                 L(i,1) = 1;
+             end
+         end
+    end
+y = L;
+end
+
+function y = Huddle(size, xuni, players, A, flagpos, flagsize)
+% Get new data and initialize new null velocities  
+
+    teamSize = players(2) - players(1) + 1;
+    x = xuni(1:2,players(1):players(2));                               % Extract single integrator states
+    circularTargets = [flagpos(1) + size*cos( 0:2*pi/teamSize:2*pi*(1- 1/teamSize) ) - flagsize*0.5 ; flagpos(2) + size*sin( 0:2*pi/teamSize:2*pi*(1- 1/teamSize) ) + flagsize*0.5 ];
+    errorToInitialPos = x - circularTargets;                      % Error
+    y = -0.3.*errorToInitialPos;
+end
+
 function [x,y] = UpdateCircle(x, th, range)
     xunit = range * cos(th) + x(1,10);
     yunit = range * sin(th) + x(2,10);
