@@ -9,6 +9,7 @@ hazardWindow = [-1,1;-1.8,1.8];
 flagSize = 0.25;
 redFlagpos = [2,1.1];
 blueFlagpos = [-2,-1.1];
+perimeterSize = 0.4;
 
 N = 10;                                     % Total number of players team
 init(1,1:N) = 2.5;                          % starting X position
@@ -64,11 +65,11 @@ for k = 1:max_iter
     
     % group up together
     if k < 700
-    u(:,D(1):D(2)) = Huddle(0.4, xuni, D, A, redFlagpos, flagSize);                 % Defense huddle
-    u(:,O(1):O(2)) = Huddle(0.4, xuni, O, A, (redFlagpos - [0,2]), flagSize);       % Offense huddle
+    u(:,D(1):D(2)) = Huddle(perimeterSize, xuni, D, redFlagpos);                 % Defense huddle
+    u(:,O(1):O(2)) = Huddle(perimeterSize, xuni, O, (redFlagpos - [0,2]));       % Offense huddle
     end
     if k > 700
-    u(:,D(1):D(2)) = CircleAround(xuni, D, A);
+    u(:,D(1):D(2)) = CircleAround(xuni, D, A, redFlagpos, perimeterSize);
     end
     %update the circle
     [xunit, yunit] = UpdateCircle(xuni(1:2,:), th, viewingDistance);
@@ -79,7 +80,7 @@ for k = 1:max_iter
     
     %move robots
     dx = si_to_uni_dyn(u, xuni);                            % Convert single integrator inputs into unicycle inputs
-    %dx = uni_barrier_cert(dx, xuni);
+    dx = uni_barrier_cert(dx, xuni);
     r.set_velocities(1:N, dx); r.step();                    % Set new velocities to robots and update
 end
 
@@ -88,17 +89,21 @@ r.debug();
 %%
 %(------------------------------------------ FUNCTIONS ------------------------------------------)
 %%
-function y = CircleAround(xuni, players, A)
-teamSize = players(2) - players(1) + 1;
+function y = FollowTheLeader(xuni, players, A)
 
-R = [cos(pi/teamSize) sin(pi/teamSize); -sin(pi/teamSize) cos(pi/teamSize)];
-x = xuni(1:2,players(1):players(2));                                      % Extract single integrator states
+end
+
+function y = CircleAround(xuni, players, A, center, size)
+teamSize = players(2) - players(1) + 1;
+x = xuni(1:2,players(1):players(2)); % Extract single integrator states
+K =  size / (sqrt([1,1] * (transpose(center) - x(:,1)).^2));
+R = [cos(K*pi/teamSize) sin(K*pi/teamSize); -sin(K*pi/teamSize) cos(K*pi/teamSize)];
 u = zeros(2,teamSize);                                                    % Initialize velocities to zero
 L = CreateCircleGraph(A(players(1):players(2),players(1):players(2)));
     for i= 1:teamSize
          for j= 1:teamSize  
              if j ~= i
-                u(:,i) = u(:,i) + 0.5 * L(i,j) * (x(:,j)-x(:,i));
+                u(:,i) = u(:,i) + 0.3 * L(i,j) * (x(:,j)-x(:,i));
              end
          end
      
@@ -126,12 +131,12 @@ L = A;
 y = L;
 end
 
-function y = Huddle(size, xuni, players, A, flagpos, flagsize)
+function y = Huddle(size, xuni, players, flagpos)
 % Get new data and initialize new null velocities  
 
     teamSize = players(2) - players(1) + 1;
     x = xuni(1:2,players(1):players(2));                               % Extract single integrator states
-    circularTargets = [flagpos(1) + size*cos( 0:2*pi/teamSize:2*pi*(1- 1/teamSize) ) - flagsize*0.5 ; flagpos(2) + size*sin( 0:2*pi/teamSize:2*pi*(1- 1/teamSize) ) + flagsize*0.5 ];
+    circularTargets = [flagpos(1) + size*cos( 0:2*pi/teamSize:2*pi*(1- 1/teamSize) ) ; flagpos(2) + size*sin( 0:2*pi/teamSize:2*pi*(1- 1/teamSize) ) ];
     errorToInitialPos = x - circularTargets;                      % Error
     y = -0.3.*errorToInitialPos;
 end
@@ -205,7 +210,7 @@ obstacleBuffer(1:3,1:number) = 999;
 end
 
 function CreateFlag(size,location,color)
-patch(location(1) + [0,-cos(pi/4)*size,0],location(2) + [0,sin(pi/4)*size,sin(pi/2)*size],color);
+patch(location(1) + [-cos(pi/4)*size/2,cos(pi/4)*size/2,-cos(pi/4)*size/2],location(2) + [-sin(pi/4)*size,0,sin(pi/4)*size],color);
 end
 
 function CreateObstacle(size,location)
