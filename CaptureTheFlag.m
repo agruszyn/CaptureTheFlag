@@ -70,7 +70,8 @@ for k = 1:max_iter
     end
     if k > 700
     u(:,D(1):D(2)) = CircleAround(xuni, D, A, redFlagpos, perimeterSize);
-    u(:,O(1):O(2)) = FollowTheLeader(xuni, O, A);
+    u(:,O(1):O(2)) = StayTogether(xuni, O, A);
+    u = AvoidObstacles(xuni, A, hazardProperties);
     end
     %update the circle
     [xunit, yunit] = UpdateCircle(xuni(1:2,:), th, viewingDistance);
@@ -90,18 +91,18 @@ r.debug();
 %%
 %(------------------------------------------ FUNCTIONS ------------------------------------------)
 %%
-function y = FollowTheLeader(xuni, players, A)
+function y = StayTogether(xuni, players, A)
     teamSize = players(2) - players(1) + 1;
     x = xuni(1:2,players(1):players(2)); % Extract single integrator states
     u = zeros(2,teamSize);
-    D = Danger(A(players(1):players(2),players(1):players(2)),x, 0.6);
+    W = Weight(A(players(1):players(2),players(1):players(2)));
     for i= 1:teamSize
          for j= 1:teamSize  
              if j ~= i
-                u(:,i) = u(:,i) +  A(i,j) * (x(:,j)-x(:,i)) - D(i,j) * ((x(:,j)-x(:,i)));
+                u(:,i) = u(:,i) - ( norm(x(:,i)-x(:,j)).^2 - W(i,j).^2)*(x(:,i)-x(:,j));
              end
          end
-     u(2,1) = u(2,1) + 0.5;
+     u(1,1) = u(1,1) - 0.2;
     end
     y = u;
 end
@@ -144,13 +145,13 @@ L = A;
 y = L;
 end
 
-function y = Danger(A, x, distance)
+function y = Weight(A)
 N = size(A,1);
 L = A;
     for i= 1:N
          for j= 1:N  
-             if j ~= i && (sqrt([1,1] * (x(:,j)-x(:,i)).^2)) < distance && A(i,j) == 1
-                L(i,j) = 0.3 + distance - (sqrt([1,1] * (x(:,j)-x(:,i)).^2));
+             if j ~= i && A(i,j) == 1
+                L(i,j) = 0.5;
              else
                 L(i,j) = 0;
              end
