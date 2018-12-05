@@ -70,6 +70,7 @@ for k = 1:max_iter
     end
     if k > 700
     u(:,D(1):D(2)) = CircleAround(xuni, D, A, redFlagpos, perimeterSize);
+    u(:,O(1):O(2)) = FollowTheLeader(xuni, O, A);
     end
     %update the circle
     [xunit, yunit] = UpdateCircle(xuni(1:2,:), th, viewingDistance);
@@ -90,7 +91,19 @@ r.debug();
 %(------------------------------------------ FUNCTIONS ------------------------------------------)
 %%
 function y = FollowTheLeader(xuni, players, A)
-
+    teamSize = players(2) - players(1) + 1;
+    x = xuni(1:2,players(1):players(2)); % Extract single integrator states
+    u = zeros(2,teamSize);
+    D = Danger(A(players(1):players(2),players(1):players(2)),x, 0.6);
+    for i= 1:teamSize
+         for j= 1:teamSize  
+             if j ~= i
+                u(:,i) = u(:,i) +  A(i,j) * (x(:,j)-x(:,i)) - D(i,j) * ((x(:,j)-x(:,i)));
+             end
+         end
+     u(2,1) = u(2,1) + 0.5;
+    end
+    y = u;
 end
 
 function y = CircleAround(xuni, players, A, center, size)
@@ -125,6 +138,21 @@ L = A;
              end
              if i == N
                  L(i,1) = 1;
+             end
+         end
+    end
+y = L;
+end
+
+function y = Danger(A, x, distance)
+N = size(A,1);
+L = A;
+    for i= 1:N
+         for j= 1:N  
+             if j ~= i && (sqrt([1,1] * (x(:,j)-x(:,i)).^2)) < distance && A(i,j) == 1
+                L(i,j) = 0.3 + distance - (sqrt([1,1] * (x(:,j)-x(:,i)).^2));
+             else
+                L(i,j) = 0;
              end
          end
     end
