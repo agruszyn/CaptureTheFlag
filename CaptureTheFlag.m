@@ -2,7 +2,7 @@ clear all, close all, clc
 
 %(------------------------------------------ PARAMETERS ------------------------------------------)
 %%
-hazardTotal = 7;                            % Total number of obstacles
+hazardTotal = 3;                            % Total number of obstacles
 hazardSizes = [0.05,0.3];
 hazardWindow = [-1,1;-1.8,1.8];
 
@@ -15,7 +15,7 @@ N = 10;                                     % Total number of players team
 init(1,1:N) = 2.5;                          % starting X position
 init(2,1:N) = linspace(1.5,-1.5,10);        % starting Y position
 init(3,1:N) = 2;                            % starting rotation
-viewingDistance = 2;                        % Range of vision for each player
+viewingDistance = 1;                        % Range of vision for each player
 D = [1,5];                                  % Players on Defense
 O = [6,10];                                 % Players on Offense
 
@@ -70,8 +70,9 @@ for k = 1:max_iter
     end
     if k > 700
     u(:,D(1):D(2)) = CircleAround(xuni, D, A, redFlagpos, perimeterSize);
-    u(:,O(1):O(2)) = StayTogether(xuni, O, A);
-    u = AvoidObstacles(xuni, A, hazardProperties);
+    u(:,O(1):O(2)) = StayTogether(xuni, O, A, blueFlagpos);
+    %u = u + Pathfinding(xuni, O, hazardProperties, viewingDistance);
+    u = u + AvoidObstacles(xuni, A, hazardProperties, viewingDistance);
     end
     %update the circle
     [xunit, yunit] = UpdateCircle(xuni(1:2,:), th, viewingDistance);
@@ -91,7 +92,34 @@ r.debug();
 %%
 %(------------------------------------------ FUNCTIONS ------------------------------------------)
 %%
-function y = StayTogether(xuni, players, A)
+function y = AvoidObstacles(X, A, hz, range)
+    teamSize = length(A(1,:));
+    x = X(1:2,:);
+    hazardTotal = length(hz(1,:));
+    A = zeros(size(A));
+    u = zeros(2,teamSize);
+    for i= 1:teamSize
+         for j= 1:hazardTotal 
+             if norm(hz(2:3,j) - x(:,i)) < 0.5 + hz(1,j)
+                A(i,j) = (1 - norm(hz(2:3,j) - x(:,i)) / 0.5).^2;
+             else
+                A(i,j) = 0;
+             end
+         end
+    end
+    for i= 1:teamSize
+         for j= 1:hazardTotal 
+             if norm(hz(2:3,j) - X(1:2,i)) < range + hz(1,j)
+                u(:,i) = u(:,i) + 4*A(i,j) * (x(:,i)-hz(2:3,j));
+             else
+                A(i,j) = 0;
+             end
+         end
+    end
+    y = u;
+end
+
+function y = StayTogether(xuni, players, A, goal)
     teamSize = players(2) - players(1) + 1;
     x = xuni(1:2,players(1):players(2)); % Extract single integrator states
     u = zeros(2,teamSize);
@@ -102,7 +130,8 @@ function y = StayTogether(xuni, players, A)
                 u(:,i) = u(:,i) - ( norm(x(:,i)-x(:,j)).^2 - W(i,j).^2)*(x(:,i)-x(:,j));
              end
          end
-     u(1,1) = u(1,1) - 0.2;
+   errorToTarget = x(:,1) - transpose(goal);                      % Error
+   u(:,1) = -0.3*errorToTarget/norm(errorToTarget);
     end
     y = u;
 end
