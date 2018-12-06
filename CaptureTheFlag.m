@@ -2,8 +2,8 @@ clear all, close all, clc
 
 %(------------------------------------------ PARAMETERS ------------------------------------------)
 %%
-hazardTotal = 3;                            % Total number of obstacles
-hazardSizes = [0.05,0.2];
+hazardTotal = 5;                            % Total number of obstacles
+hazardSizes = [0.05,0.15];
 hazardWindow = [-1,1;-1.8,1.8];
 
 flagSize = 0.25;
@@ -19,7 +19,7 @@ viewingDistance = 1;                        % Range of vision for each player
 D = [1,5];                                  % Players on Defense
 O = [6,10];                                 % Players on Offense
 
-max_iter = 3000;                            % max script time
+max_iter = 10000;                            % max script time
 dt = 0.01;                                  % numerical steplength
 
 lambda = 0.05;                              % lambda for barrier certificate
@@ -33,7 +33,8 @@ center = [0;0];                             % center of field
 A = zeros(N,N);                             % agent connection matrix
 th = 0:pi/50:2*pi;                          % list of points around a circle
 def = 0;off = 0;
- backToBase = 0;   
+backToBase = 0;
+complete = 0;
 % INITIALIZE ROBOTARIUM
 r = Robotarium('NumberOfRobots', N, 'ShowFigure', true, 'InitialConditions', init);     % Robotarium initial conditions
 safety = barrierDistance * r.robot_diameter; 
@@ -74,6 +75,7 @@ for k = 1:max_iter
     
     end
     if backToBase == 1
+    u(:,D(1):D(2)) = CircleAround(xuni, D, A, redFlagpos, perimeterSize);
     [u(:,O(1):O(2)),complete] = StayTogether(xuni, O, A, redFlagpos);
     flag = UpdateFlag(flagSize,xuni(1:2,6) + [0;0.2]);
     P.Vertices = flag;
@@ -84,7 +86,9 @@ for k = 1:max_iter
     refreshdata(h);
     %update the edges
     A = UpdateConnections(A,viewingDistance, x, N);
-    
+    if complete
+        break;
+    end
     %move robots
     dx = si_to_uni_dyn(u, xuni);                            % Convert single integrator inputs into unicycle inputs
     dx = uni_barrier_cert(dx, xuni);
@@ -104,8 +108,8 @@ function y = AvoidObstacles(X, A, hz, range)
     u = zeros(2,teamSize);
     for i= 1:teamSize
          for j= 1:hazardTotal 
-             if norm(hz(2:3,j) - x(:,i)) < 0.5 + hz(1,j)
-                A(i,j) = (1 - norm(hz(2:3,j) - x(:,i)) / 0.5).^2;
+             if norm(hz(2:3,j) - x(:,i)) < 0.4 + hz(1,j)
+                A(i,j) = (1 - 0.8*norm(hz(2:3,j) - x(:,i)) / 0.4).^2;
              else
                 A(i,j) = 0;
              end
