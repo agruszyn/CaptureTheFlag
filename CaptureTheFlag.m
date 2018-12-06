@@ -3,7 +3,7 @@ clear all, close all, clc
 %(------------------------------------------ PARAMETERS ------------------------------------------)
 %%
 hazardTotal = 3;                            % Total number of obstacles
-hazardSizes = [0.05,0.3];
+hazardSizes = [0.05,0.2];
 hazardWindow = [-1,1;-1.8,1.8];
 
 flagSize = 0.25;
@@ -23,7 +23,7 @@ max_iter = 3000;                            % max script time
 dt = 0.01;                                  % numerical steplength
 
 lambda = 0.05;                              % lambda for barrier certificate
-barrierDistance = 1.2;                       % safety distance for barrier certificate
+barrierDistance = 1.3;                       % safety distance for barrier certificate
 %%
 %(------------------------------------------ INITIALIZATIONS ------------------------------------------)
 %%
@@ -32,7 +32,8 @@ hazardProperties = zeros(3,hazardTotal);    % Location and size of hazards
 center = [0;0];                             % center of field
 A = zeros(N,N);                             % agent connection matrix
 th = 0:pi/50:2*pi;                          % list of points around a circle
-
+def = 0;off = 0;
+ backToBase = 0;   
 % INITIALIZE ROBOTARIUM
 r = Robotarium('NumberOfRobots', N, 'ShowFigure', true, 'InitialConditions', init);     % Robotarium initial conditions
 safety = barrierDistance * r.robot_diameter; 
@@ -44,7 +45,7 @@ r.step();                                                   % Run robotarium ste
 hazardProperties = PopulateHazards(hazardTotal, hazardSizes, hazardWindow);     % create the hazards
 
 CreateFlag(flagSize, redFlagpos, 'red');                                % create the red flag
-CreateFlag(flagSize, blueFlagpos, 'blue');                              % create the blue flag
+P = CreateFlag(flagSize, blueFlagpos, 'blue');                              % create the blue flag
 
 xunit = viewingDistance * cos(th) + x(1,10);                    % x position of points around a circle
 yunit = viewingDistance * sin(th) + x(2,10);                    % y position of points around a circle
@@ -62,22 +63,25 @@ for k = 1:max_iter
     disp(k);
     xuni = r.get_poses();                                   % Get new robots' states
     u = zeros(2,N);
-    
     % group up together
-    if k < 700
-    u(:,D(1):D(2)) = Huddle(perimeterSize, xuni, D, redFlagpos);                 % Defense huddle
-    u(:,O(1):O(2)) = Huddle(perimeterSize, xuni, O, (redFlagpos - [0,2]));       % Offense huddle
+    if def == 0 || off == 0
+    [u(:,D(1):D(2)),def] = Huddle(perimeterSize, xuni, D, redFlagpos);                 % Defense huddle
+    [u(:,O(1):O(2)),off] = Huddle(perimeterSize, xuni, O, (redFlagpos - [0,2]));       % Offense huddle
     end
-    if k > 700
+    if def == 1 && off == 1 && backToBase == 0
     u(:,D(1):D(2)) = CircleAround(xuni, D, A, redFlagpos, perimeterSize);
-    u(:,O(1):O(2)) = StayTogether(xuni, O, A, blueFlagpos);
-    %u = u + Pathfinding(xuni, O, hazardProperties, viewingDistance);
-    u = u + AvoidObstacles(xuni, A, hazardProperties, viewingDistance);
+    [u(:,O(1):O(2)),backToBase] = StayTogether(xuni, O, A, blueFlagpos);
+    
     end
+    if backToBase == 1
+    [u(:,O(1):O(2)),complete] = StayTogether(xuni, O, A, redFlagpos);
+    flag = UpdateFlag(flagSize,xuni(1:2,6) + [0;0.2]);
+    P.Vertices = flag;
+    end
+    u = u + AvoidObstacles(xuni, A, hazardProperties, viewingDistance);
     %update the circle
     [xunit, yunit] = UpdateCircle(xuni(1:2,:), th, viewingDistance);
     refreshdata(h);
-    
     %update the edges
     A = UpdateConnections(A,viewingDistance, x, N);
     
@@ -119,7 +123,7 @@ function y = AvoidObstacles(X, A, hz, range)
     y = u;
 end
 
-function y = StayTogether(xuni, players, A, goal)
+function [y,b] = StayTogether(xuni, players, A, goal)
     teamSize = players(2) - players(1) + 1;
     x = xuni(1:2,players(1):players(2)); % Extract single integrator states
     u = zeros(2,teamSize);
@@ -134,6 +138,11 @@ function y = StayTogether(xuni, players, A, goal)
    u(:,1) = -0.3*errorToTarget/norm(errorToTarget);
     end
     y = u;
+    if norm(errorToTarget)^2 < 0.03
+        b = 1;
+    else
+        b = 0;
+    end
 end
 
 function y = CircleAround(xuni, players, A, center, size)
@@ -189,7 +198,7 @@ L = A;
 y = L;
 end
 
-function y = Huddle(size, xuni, players, flagpos)
+function [y,b] = Huddle(size, xuni, players, flagpos)
 % Get new data and initialize new null velocities  
 
     teamSize = players(2) - players(1) + 1;
@@ -197,11 +206,16 @@ function y = Huddle(size, xuni, players, flagpos)
     circularTargets = [flagpos(1) + size*cos( 0:2*pi/teamSize:2*pi*(1- 1/teamSize) ) ; flagpos(2) + size*sin( 0:2*pi/teamSize:2*pi*(1- 1/teamSize) ) ];
     errorToInitialPos = x - circularTargets;                      % Error
     y = -0.3.*errorToInitialPos;
+    if norm(errorToInitialPos)^2 < 0.03
+    b = 1;
+    else
+    b = 0;
+    end
 end
 
 function [x,y] = UpdateCircle(x, th, range)
-    xunit = range * cos(th) + x(1,10);
-    yunit = range * sin(th) + x(2,10);
+    xunit = range * cos(th) + x(1,6);
+    yunit = range * sin(th) + x(2,6);
     x = xunit;
     y = yunit;
 end
@@ -267,8 +281,17 @@ obstacleBuffer(1:3,1:number) = 999;
     y = obstacleBuffer;
 end
 
-function CreateFlag(size,location,color)
-patch(location(1) + [-cos(pi/4)*size/2,cos(pi/4)*size/2,-cos(pi/4)*size/2],location(2) + [-sin(pi/4)*size,0,sin(pi/4)*size],color);
+function y = CreateFlag(size,location,color)
+y = patch(location(1) + [-cos(pi/4)*size/2,cos(pi/4)*size/2,-cos(pi/4)*size/2],location(2) + [-sin(pi/4)*size,0,sin(pi/4)*size],color);
+end
+
+function y = UpdateFlag(size, location)
+%x = location(1) + [-cos(pi/4)*size/2,cos(pi/4)*size/2,-cos(pi/4)*size/2];
+%y = location(2) + [-sn(pi/4)*size,0,sin(pi/4)*size];
+col = location(1) + [-cos(pi/4)*size/2;cos(pi/4)*size/2;-cos(pi/4)*size/2];
+ver = location(2) + [-sin(pi/4)*size;0;sin(pi/4)*size];
+y = [col ver];
+%y = [(location(1) + [-cos(pi/4)*size/2;cos(pi/4)*size/2;-cos(pi/4)*size/2]) (location(2) + [-sin(pi/4)*size,0,sin(pi/4)*size])];
 end
 
 function CreateObstacle(size,location)
